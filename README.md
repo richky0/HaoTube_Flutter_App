@@ -39,7 +39,6 @@ A video streaming application built with Flutter to deliver a smooth and intuiti
 
 1. Clone repository
 ```bash
-git clone <repository-url>
 cd haotube_working
 ```
 
