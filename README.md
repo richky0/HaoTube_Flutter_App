@@ -1,7 +1,6 @@
-```markdown
-# 🎥 HaoTube - Video Streaming App
+# 🎥 HaoTube - Video Streaming Application
 
-A Flutter-built video streaming application delivering a smooth and intuitive video watching experience.
+A video streaming application built with Flutter to deliver a smooth and intuitive video watching experience.
 
 ## ✨ Main Features
 
@@ -49,7 +48,7 @@ cd haotube_working
 flutter pub get
 ```
 
-3. Run the app
+3. Run the application
 ```bash
 flutter run
 ```
@@ -80,12 +79,12 @@ lib/
 
 ## 🐛 Known Issues
 
-### Video Pause/Repeat in Fullscreen
-There's a bug where video will **pause or repeat** when:
+### Video Pause/Repeat in Fullscreen Mode
+There is a bug where video will **pause or repeat** when:
 - ✋ **Entering fullscreen mode**
 - ✋ **Exiting fullscreen mode**
 
-**Status**: Under repair  
+**Status**: Currently being fixed  
 **Affected**: youtube_player_flutter dependency  
 **Workaround**: Refresh or restart video playback if experiencing the issue
 
@@ -93,9 +92,9 @@ If you find a solution or have suggestions, please create an **Issue** or **Pull
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how:
+Contributions are highly welcome! Here's how:
 
-1. Fork the repository
+1. Fork this repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
@@ -113,4 +112,3 @@ If you have any questions or suggestions, please create an issue in this reposit
 
 **Developer**: Richky Sung  
 **Last Updated**: December 29, 2025
-```
