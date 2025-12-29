@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class YouTubeService {
-  static const String _apiKey = 'AIzaSyDLqvCUzYm8qHjk0hGnw9z3KG-a3dY6KCg';
+  static const String _apiKey = 'YOUR_API_KEY';
   static const String _baseUrl = 'https://www.googleapis.com/youtube/v3';
 
   static Future<List<YouTubeVideo>> getRandomPopularVideos() async {
