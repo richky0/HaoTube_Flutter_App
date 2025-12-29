@@ -1,18 +1,17 @@
-# 🎥 HaoTube - Aplikasi Video Streaming
+```markdown
+# 🎥 HaoTube - Video Streaming App
 
-Aplikasi video streaming yang dibangun dengan Flutter untuk memberikan pengalaman menonton video yang mulus dan intuitif.
+A Flutter-built video streaming application delivering a smooth and intuitive video watching experience.
 
+## ✨ Main Features
 
+- 🎬 **Video Streaming** - Play videos from YouTube with the best quality
+- 🔍 **Video Search** - Easily search for favorite videos
+- 📱 **Responsive Design** - Responsive display across various screen sizes
+- 🎨 **Modern UI** - Clean and user-friendly interface with Material Design 3
+- 📺 **Fullscreen Mode** - Immersive fullscreen viewing experience
 
-## ✨ Fitur Utama
-
-- 🎬 **Streaming Video** - Putar video dari YouTube dengan kualitas terbaik
-- 🔍 **Search Video** - Cari video favorit dengan mudah
-- 📱 **Responsive Design** - Tampilan yang responsif di berbagai ukuran layar
-- 🎨 **Modern UI** - Antarmuka yang clean dan user-friendly dengan desain Material Design 3
-- 📺 **Fullscreen Mode** - Mode fullscreen untuk pengalaman menonton yang immersive
-
-## 🛠️ Teknologi yang Digunakan
+## 🛠️ Technologies Used
 
 - **Framework**: Flutter 3.0+
 - **Language**: Dart 3.0+
@@ -20,24 +19,24 @@ Aplikasi video streaming yang dibangun dengan Flutter untuk memberikan pengalama
 - **Font**: Google Fonts (Poppins)
 - **Video Player**: youtube_player_flutter
 
-## 📦 Dependencies Utama
+## 📦 Main Dependencies
 
 ```yaml
-- flutter: SDK utama
-- google_fonts: ^6.1.0 - Font Google custom
-- http: ^1.5.0 - HTTP client untuk API calls
+- flutter: Main SDK
+- google_fonts: ^6.1.0 - Custom Google fonts
+- http: ^1.5.0 - HTTP client for API calls
 - youtube_player_flutter: ^9.1.3 - YouTube player widget
-- url_launcher: ^6.3.2 - Membuka URL eksternal
+- url_launcher: ^6.3.2 - Open external URLs
 ```
 
-## 🚀 Cara Memulai
+## 🚀 Getting Started
 
 ### Prerequisites
 - Flutter SDK 3.0.0+
 - Dart 3.0.0+
 - Git
 
-### Instalasi
+### Installation
 
 1. Clone repository
 ```bash
@@ -50,12 +49,12 @@ cd haotube_working
 flutter pub get
 ```
 
-3. Run aplikasi
+3. Run the app
 ```bash
 flutter run
 ```
 
-### Build untuk Production
+### Build for Production
 
 **Android:**
 ```bash
@@ -67,11 +66,11 @@ flutter build apk
 flutter build ios
 ```
 
-## 📁 Struktur Project
+## 📁 Project Structure
 
 ```
 lib/
-├── main.dart                 # Entry point aplikasi
+├── main.dart                 # Application entry point
 ├── screen/                   # UI screens
 ├── services/
 │   └── youtube_service.dart  # YouTube API service
@@ -79,39 +78,39 @@ lib/
     └── colors.dart           # Color constants
 ```
 
-## 🐛 Known Issues (Bug yang Diketahui)
+## 🐛 Known Issues
 
-### Video Pause/Repeat pada Fullscreen
-Terdapat bug di mana video akan **pause atau terulang** ketika:
-- ✋ **Masuk ke fullscreen mode**
-- ✋ **Exit dari fullscreen mode**
+### Video Pause/Repeat in Fullscreen
+There's a bug where video will **pause or repeat** when:
+- ✋ **Entering fullscreen mode**
+- ✋ **Exiting fullscreen mode**
 
-**Status**: Dalam proses perbaikan  
+**Status**: Under repair  
 **Affected**: youtube_player_flutter dependency  
-**Workaround**: Refresh atau restart video playback jika mengalami issue
+**Workaround**: Refresh or restart video playback if experiencing the issue
 
-Jika Anda menemukan solusi atau memiliki suggestion, silakan buat **Issue** atau **Pull Request**.
+If you find a solution or have suggestions, please create an **Issue** or **Pull Request**.
 
-## 🤝 Berkontribusi
+## 🤝 Contributing
 
-Kontribusi sangat diterima! Berikut caranya:
+Contributions are welcome! Here's how:
 
-1. Fork repository ini
-2. Buat branch untuk fitur Anda (`git checkout -b feature/AmazingFeature`)
-3. Commit perubahan (`git commit -m 'Add some AmazingFeature'`)
-4. Push ke branch (`git push origin feature/AmazingFeature`)
-5. Buat Pull Request
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Create a Pull Request
 
-## 📝 Lisensi
+## 📝 License
 
-Project ini berlisensi di bawah MIT License - lihat file LICENSE untuk detail.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📧 Kontak
+## 📧 Contact
 
-Jika ada pertanyaan atau saran, silakan buat issue di repository ini.
+If you have any questions or suggestions, please create an issue in this repository.
 
 ---
 
 **Developer**: Richky Sung  
-**Last Updated**: December 29, 2025  
-**Status**: Active Development 🔄
+**Last Updated**: December 29, 2025
+```
