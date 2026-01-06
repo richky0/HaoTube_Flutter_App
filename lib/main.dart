@@ -1,1731 +1,1525 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'services/youtube_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'dart:ui';
+import 'package:flutter/rendering.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const Click4FunApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+// Model untuk Link
+class Link {
+  final String id;
+  final String title;
+  final String url;
+  final String icon;
+  final int colorValue;
+
+  Link({
+    required this.id,
+    required this.title,
+    required this.url,
+    required this.icon,
+    required this.colorValue,
+  });
+
+  Color get color => Color(colorValue);
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'url': url,
+    'icon': icon,
+    'colorValue': colorValue,
+  };
+
+  factory Link.fromJson(Map<String, dynamic> json) => Link(
+    id: json['id'],
+    title: json['title'],
+    url: json['url'],
+    icon: json['icon'],
+    colorValue: json['colorValue'],
+  );
+}
+
+// Helper untuk membuat warna
+int getColorValue(int r, int g, int b) {
+  return (0xFF << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
+}
+
+// Service untuk menyimpan link
+class LinkService {
+  static const String _key = 'click4fun_links';
+
+  Future<List<Link>> getLinks() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString(_key);
+
+    if (jsonString == null) return _getDefaultLinks();
+
+    try {
+      final List<dynamic> jsonList = json.decode(jsonString);
+      return jsonList.map((json) => Link.fromJson(json)).toList();
+    } catch (e) {
+      return _getDefaultLinks();
+    }
+  }
+
+  Future<void> saveLinks(List<Link> links) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = links.map((link) => link.toJson()).toList();
+    await prefs.setString(_key, json.encode(jsonList));
+  }
+
+  List<Link> _getDefaultLinks() {
+    return [
+      Link(
+        id: '1',
+        title: 'Google Search',
+        url: 'https://google.com',
+        icon: '🌐',
+        colorValue: getColorValue(66, 133, 244),
+      ),
+      Link(
+        id: '2',
+        title: 'YouTube Videos',
+        url: 'https://youtube.com',
+        icon: '📺',
+        colorValue: getColorValue(255, 0, 0),
+      ),
+      Link(
+        id: '3',
+        title: 'GitHub Repository',
+        url: 'https://github.com',
+        icon: '💻',
+        colorValue: getColorValue(36, 41, 46),
+      ),
+      Link(
+        id: '4',
+        title: 'Twitter Social',
+        url: 'https://twitter.com',
+        icon: '🐦',
+        colorValue: getColorValue(29, 161, 242),
+      ),
+      Link(
+        id: '5',
+        title: 'Instagram Photos',
+        url: 'https://instagram.com',
+        icon: '📸',
+        colorValue: getColorValue(225, 48, 108),
+      ),
+      Link(
+        id: '6',
+        title: 'Facebook Social Network',
+        url: 'https://facebook.com',
+        icon: '👥',
+        colorValue: getColorValue(24, 119, 242),
+      ),
+      Link(
+        id: '7',
+        title: 'LinkedIn Professional',
+        url: 'https://linkedin.com',
+        icon: '💼',
+        colorValue: getColorValue(10, 102, 194),
+      ),
+      Link(
+        id: '8',
+        title: 'Netflix Movies',
+        url: 'https://netflix.com',
+        icon: '🎬',
+        colorValue: getColorValue(229, 9, 20),
+      ),
+    ];
+  }
+}
+
+// Main App dengan animasi page transition
+class Click4FunApp extends StatelessWidget {
+  const Click4FunApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'HaoTube',
-      theme: ThemeData(
-        primaryColor: const Color(0xFF1a73e8),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF1a73e8),
-          secondary: Color(0xFFfbbc04),
-          surface: Color(0xFFf8f9fa),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFf8f9fa),
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 1,
-          titleTextStyle: GoogleFonts.poppins(
-            color: Colors.black,
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Colors.white,
-          selectedItemColor: Color(0xFF1a73e8),
-          unselectedItemColor: Color(0xFF5f6368),
-        ),
-        textTheme: GoogleFonts.poppinsTextTheme(),
-      ),
-      home: const MainScreen(),
+      title: 'Link4Fun',
       debugShowCheckedModeBanner: false,
-    );
-  }
-}
-
-// VIDEO PLAYER MANAGER - Pendekatan Singleton
-class VideoPlayerManager {
-  static final VideoPlayerManager _instance = VideoPlayerManager._internal();
-  factory VideoPlayerManager() => _instance;
-  VideoPlayerManager._internal();
-
-  YoutubePlayerController? _controller;
-  bool _isMiniPlayerVisible = false;
-  bool _isPlaying = false;
-  bool _isFullscreen = false;
-  String? _currentVideoId;
-  String? _currentVideoTitle;
-  Duration? _lastPosition;
-
-  // Callbacks untuk UI update
-  VoidCallback? _onStateChanged;
-
-  YoutubePlayerController? get controller => _controller;
-  bool get isMiniPlayerVisible => _isMiniPlayerVisible;
-  bool get isPlaying => _isPlaying;
-  bool get isFullscreen => _isFullscreen;
-  String? get currentVideoId => _currentVideoId;
-  String? get currentVideoTitle => _currentVideoTitle;
-  Duration? get lastPosition => _lastPosition;
-
-  void setOnStateChanged(VoidCallback callback) {
-    _onStateChanged = callback;
-  }
-
-  void _notifyListeners() {
-    _onStateChanged?.call();
-  }
-
-  void initializeController(String videoId, String videoTitle) {
-    if (_controller != null && _currentVideoId == videoId) {
-      return; // Controller sudah ada untuk video ini
-    }
-
-    // Dispose controller lama jika ada
-    _controller?.dispose();
-
-    _controller = YoutubePlayerController(
-      initialVideoId: videoId,
-      flags: const YoutubePlayerFlags(
-        autoPlay: true,
-        mute: false,
-        forceHD: false,
-        hideControls: false,
-        controlsVisibleAtStart: true,
-        enableCaption: false,
-        isLive: false,
-      ),
-    );
-
-    _currentVideoId = videoId;
-    _currentVideoTitle = videoTitle;
-    _isPlaying = true;
-    _isFullscreen = false;
-
-    // Setup listener untuk update state
-    _controller!.addListener(() {
-      if (_controller!.value.isPlaying != _isPlaying) {
-        _isPlaying = _controller!.value.isPlaying;
-        _notifyListeners();
-      }
-    });
-
-    _notifyListeners();
-  }
-
-  void saveCurrentPosition() {
-    if (_controller != null) {
-      _lastPosition = _controller!.value.position;
-    }
-  }
-
-  void restorePosition() {
-    if (_controller != null && _lastPosition != null) {
-      _controller!.seekTo(_lastPosition!);
-    }
-  }
-
-  void showMiniPlayer() {
-    _isMiniPlayerVisible = true;
-    _notifyListeners();
-  }
-
-  void hideMiniPlayer() {
-    _isMiniPlayerVisible = false;
-    _notifyListeners();
-  }
-
-  void togglePlayPause() {
-    if (_controller != null) {
-      if (_isPlaying) {
-        _controller!.pause();
-      } else {
-        _controller!.play();
-      }
-      _isPlaying = !_isPlaying;
-      _notifyListeners();
-    }
-  }
-
-  void enterFullscreen() {
-    _isFullscreen = true;
-    saveCurrentPosition();
-    _notifyListeners();
-  }
-
-  void exitFullscreen() {
-    _isFullscreen = false;
-    saveCurrentPosition();
-    _notifyListeners();
-  }
-
-  void disposeController() {
-    _controller?.dispose();
-    _controller = null;
-    _currentVideoId = null;
-    _currentVideoTitle = null;
-    _isPlaying = false;
-    _isFullscreen = false;
-    _lastPosition = null;
-    _notifyListeners();
-  }
-}
-
-// Singleton instance
-final videoPlayerManager = VideoPlayerManager();
-
-// FULLSCREEN VIDEO PLAYER SCREEN - Versi Sederhana
-class FullscreenVideoPlayer extends StatefulWidget {
-  final String videoId;
-  final String videoTitle;
-
-  const FullscreenVideoPlayer({
-    super.key,
-    required this.videoId,
-    required this.videoTitle,
-  });
-
-  @override
-  State<FullscreenVideoPlayer> createState() => _FullscreenVideoPlayerState();
-}
-
-class _FullscreenVideoPlayerState extends State<FullscreenVideoPlayer> {
-  bool _isTitleVisible = false;
-  Timer? _titleTimer;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Set fullscreen state
-    videoPlayerManager.enterFullscreen();
-
-    // Setup fullscreen orientation
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _enterFullscreen();
-    });
-
-    _showTitleTemporarily();
-  }
-
-  void _enterFullscreen() {
-    // Set landscape orientation
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-
-    // Hide system UI completely
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.immersiveSticky,
-      overlays: [],
-    );
-  }
-
-  void _exitFullscreen() {
-    // Restore portrait orientation
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-
-    // Restore system UI
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.edgeToEdge,
-      overlays: SystemUiOverlay.values,
-    );
-  }
-
-  void _showTitleTemporarily() {
-    setState(() {
-      _isTitleVisible = true;
-    });
-
-    _titleTimer?.cancel();
-    _titleTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _isTitleVisible = false;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _titleTimer?.cancel();
-    _exitFullscreen();
-    videoPlayerManager.exitFullscreen();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        _handleExit();
-        return false;
-      },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: GestureDetector(
-          onTap: () {
-            _showTitleTemporarily();
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
+        ),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: ZoomPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           },
-          child: Stack(
-            children: [
-              // YOUTUBE PLAYER
-              Center(
-                child: YoutubePlayer(
-                  controller: videoPlayerManager.controller!,
-                  aspectRatio: 16 / 9,
-                  showVideoProgressIndicator: true,
-                  progressIndicatorColor: const Color(0xFF1a73e8),
-                  progressColors: const ProgressBarColors(
-                    playedColor: Color(0xFF1a73e8),
-                    handleColor: Color(0xFF1a73e8),
-                    bufferedColor: Colors.grey,
-                    backgroundColor: Colors.grey,
-                  ),
-                  onReady: () {
-                    // Restore position jika ada
-                    if (videoPlayerManager.lastPosition != null) {
-                      videoPlayerManager.controller!.seekTo(
-                        videoPlayerManager.lastPosition!,
-                      );
-                    }
-                  },
-                  bottomActions: [
-                    CurrentPosition(),
-                    ProgressBar(
-                      isExpanded: true,
-                      colors: const ProgressBarColors(
-                        playedColor: Color(0xFF1a73e8),
-                        handleColor: Color(0xFF1a73e8),
-                      ),
-                    ),
-                    RemainingDuration(),
-                    IconButton(
-                      icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
-                      onPressed: () {
-                        _handleExit();
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              // BACK BUTTON
-              if (_isTitleVisible)
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: GestureDetector(
-                    onTap: () {
-                      _handleExit();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                ),
-
-              // VIDEO TITLE
-              if (_isTitleVisible)
-                Positioned(
-                  top: 10,
-                  left: 60,
-                  right: 60,
-                  child: Center(
-                    child: Text(
-                      widget.videoTitle,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
         ),
       ),
-    );
-  }
-
-  void _handleExit() {
-    videoPlayerManager.saveCurrentPosition();
-    Navigator.of(context).pop();
-  }
-}
-
-// YOUTUBE PLAYER WIDGET
-class YouTubePlayerWidget extends StatefulWidget {
-  final String videoId;
-  final String videoTitle;
-  final bool autoPlay;
-
-  const YouTubePlayerWidget({
-    super.key,
-    required this.videoId,
-    required this.videoTitle,
-    this.autoPlay = true,
-  });
-
-  @override
-  State<YouTubePlayerWidget> createState() => _YouTubePlayerWidgetState();
-}
-
-class _YouTubePlayerWidgetState extends State<YouTubePlayerWidget> {
-  bool _isLoading = true;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // Initialize or reuse controller
-    if (videoPlayerManager.controller == null ||
-        videoPlayerManager.currentVideoId != widget.videoId) {
-      videoPlayerManager.initializeController(widget.videoId, widget.videoTitle);
-    } else {
-      // Restore position jika kembali dari fullscreen
-      videoPlayerManager.restorePosition();
-    }
-
-    // Show miniplayer
-    videoPlayerManager.showMiniPlayer();
-
-    // Simulate loading
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    });
-  }
-
-  void _retryLoading() {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-    videoPlayerManager.controller!.load(widget.videoId);
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    });
-  }
-
-  void _enterFullscreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FullscreenVideoPlayer(
-          videoId: widget.videoId,
-          videoTitle: widget.videoTitle,
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
         ),
-        fullscreenDialog: true,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 220,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: _buildPlayerContent(),
-    );
-  }
-
-  Widget _buildPlayerContent() {
-    if (_hasError) {
-      return _buildErrorState();
-    }
-
-    if (_isLoading || videoPlayerManager.controller == null) {
-      return _buildLoadingState();
-    }
-
-    return YoutubePlayer(
-      controller: videoPlayerManager.controller!,
-      aspectRatio: 16 / 9,
-      showVideoProgressIndicator: true,
-      progressIndicatorColor: const Color(0xFF1a73e8),
-      progressColors: const ProgressBarColors(
-        playedColor: Color(0xFF1a73e8),
-        handleColor: Color(0xFF1a73e8),
-        bufferedColor: Colors.grey,
-        backgroundColor: Colors.grey,
-      ),
-      bottomActions: [
-        CurrentPosition(),
-        ProgressBar(
-          isExpanded: true,
-          colors: const ProgressBarColors(
-            playedColor: Color(0xFF1a73e8),
-            handleColor: Color(0xFF1a73e8),
-          ),
-        ),
-        RemainingDuration(),
-        IconButton(
-          icon: const Icon(Icons.fullscreen, color: Colors.white),
-          onPressed: _enterFullscreen,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(
-              color: Color(0xFF1a73e8),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Memuat video...',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-              ),
-            ),
-          ],
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: ZoomPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          },
         ),
       ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.error_outline,
-              color: Colors.white,
-              size: 50,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Gagal memuat video',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _retryLoading,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1a73e8),
-              ),
-              child: const Text(
-                'Coba Lagi',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-      ),
+      home: const HomeScreen(),
     );
   }
 }
 
-// VIDEO THUMBNAIL
-class VideoThumbnail extends StatelessWidget {
-  final String thumbnailUrl;
-  final String duration;
-
-  const VideoThumbnail({
-    super.key,
-    required this.thumbnailUrl,
-    required this.duration,
-  });
+// Home Screen
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(12),
-              topRight: Radius.circular(12),
-            ),
-            image: DecorationImage(
-              image: NetworkImage(thumbnailUrl),
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 8,
-          right: 8,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              duration,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-        Positioned.fill(
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 30,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// MAIN SCREEN
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
-
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
-  late Future<List<YouTubeVideo>> _videosFuture;
-  bool _isSearching = false;
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  final LinkService _linkService = LinkService();
+  late Future<List<Link>> _linksFuture;
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _urlController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _slideAnimation;
+
+  List<Link> _allLinks = [];
+  List<Link> _filteredLinks = [];
+  bool _isSearching = false;
+  String _currentSearchQuery = '';
+
   @override
   void initState() {
     super.initState();
-    _loadVideos();
-    _searchFocusNode.addListener(_onSearchFocusChanged);
+    _loadLinks();
 
-    // Setup listener untuk video player manager
-    videoPlayerManager.setOnStateChanged(() {
-      if (mounted) setState(() {});
+    // Setup animasi
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _slideAnimation = Tween<double>(begin: -50.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutBack,
+      ),
+    );
+
+    // Start animasi saat init
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _animationController.forward();
+    });
+
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _loadLinks() async {
+    setState(() {
+      _linksFuture = _linkService.getLinks();
+    });
+
+    final links = await _linkService.getLinks();
+    setState(() {
+      _allLinks = links;
+      _filteredLinks = links;
     });
   }
 
-  void _onSearchFocusChanged() {
-    if (!_searchFocusNode.hasFocus && _searchController.text.isEmpty) {
+  void _onSearchChanged() {
+    final query = _searchController.text.trim();
+    setState(() {
+      _currentSearchQuery = query;
+    });
+
+    if (query.isEmpty) {
       setState(() {
-        _isSearching = false;
+        _filteredLinks = _allLinks;
+      });
+    } else {
+      final filtered = _allLinks.where((link) {
+        return link.title.toLowerCase().contains(query.toLowerCase()) ||
+            link.url.toLowerCase().contains(query.toLowerCase());
+      }).toList();
+
+      setState(() {
+        _filteredLinks = filtered;
       });
     }
   }
 
-  void _loadVideos() {
-    _videosFuture = YouTubeService.getRandomPopularVideos();
-  }
-
-  void _refreshVideos() {
+  void _startSearch() {
     setState(() {
-      _loadVideos();
+      _isSearching = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
     });
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.removeListener(_onSearchFocusChanged);
-    _searchFocusNode.dispose();
-    super.dispose();
+  void _stopSearch() {
+    setState(() {
+      _isSearching = false;
+      _searchController.clear();
+      _currentSearchQuery = '';
+      _filteredLinks = _allLinks;
+    });
+    _searchFocusNode.unfocus();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _isSearching ? _buildSearchAppBar() : _buildNormalAppBar(),
-      body: Stack(
-        children: [
-          _currentIndex == 0
-              ? HomeScreen(
-            videosFuture: _videosFuture,
-            onRefresh: _refreshVideos,
-          )
-              : _buildLibraryScreen(),
+  // Fungsi untuk membuat text dengan highlight - PERBAIKAN KONSISTENSI WARNA
+  Widget _buildHighlightedText(String text, String query, BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white.withOpacity(0.87) : Colors.black87;
+    final highlightColor = Theme.of(context).colorScheme.primary;
+    final highlightBgColor = isDark
+        ? highlightColor.withOpacity(0.3)
+        : highlightColor.withOpacity(0.1);
 
-          // MINI PLAYER
-          if (videoPlayerManager.isMiniPlayerVisible &&
-              videoPlayerManager.controller != null &&
-              !videoPlayerManager.isFullscreen)
-            Positioned(
-              bottom: 80,
-              right: 16,
-              child: _buildMiniPlayer(),
-            ),
-        ],
+    if (query.isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 17,
+          color: textColor,
+        ),
+      );
+    }
+
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+
+    if (!lowerText.contains(lowerQuery)) {
+      return Text(
+        text,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 17,
+          color: textColor,
+        ),
+      );
+    }
+
+    final matches = <TextSpan>[];
+    int start = 0;
+    int end;
+
+    while ((end = lowerText.indexOf(lowerQuery, start)) != -1) {
+      // Tambahkan teks sebelum match
+      if (end > start) {
+        matches.add(TextSpan(
+          text: text.substring(start, end),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 17,
+            color: textColor,
+          ),
+        ));
+      }
+
+      // Tambahkan teks yang match dengan highlight
+      matches.add(TextSpan(
+        text: text.substring(end, end + query.length),
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 17,
+          color: highlightColor,
+          backgroundColor: highlightBgColor,
+        ),
+      ));
+
+      start = end + query.length;
+    }
+
+    // Tambahkan sisa teks setelah match terakhir
+    if (start < text.length) {
+      matches.add(TextSpan(
+        text: text.substring(start),
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 17,
+          color: textColor,
+        ),
+      ));
+    }
+
+    return RichText(
+      text: TextSpan(
+        children: matches,
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      overflow: TextOverflow.ellipsis,
     );
   }
 
-  Widget _buildLibraryScreen() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.video_library,
-            size: 64,
-            color: Colors.grey,
+  Future<void> _refreshLinks() async {
+    await _loadLinks();
+    _showSuccess('Links refreshed');
+  }
+
+  Future<void> _addLink() async {
+    final title = _titleController.text.trim();
+    final url = _urlController.text.trim();
+
+    if (title.isEmpty || url.isEmpty) {
+      _showError('Please fill in both title and URL');
+      return;
+    }
+
+    final links = await _linkService.getLinks();
+    final newLink = Link(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      url: url.startsWith('http') ? url : 'https://$url',
+      icon: '🔗',
+      colorValue: getColorValue(33, 150, 243),
+    );
+
+    links.add(newLink);
+    await _linkService.saveLinks(links);
+
+    _titleController.clear();
+    _urlController.clear();
+
+    if (!mounted) return;
+
+    await _loadLinks();
+    _showSuccess('Link added successfully!');
+  }
+
+  Future<void> _deleteLink(Link link) async {
+    // Tampilkan konfirmasi delete
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Link'),
+        content: Text('Are you sure you want to delete "${link.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-          SizedBox(height: 16),
-          Text(
-            'Koleksi Video',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final links = await _linkService.getLinks();
+    links.removeWhere((l) => l.id == link.id);
+    await _linkService.saveLinks(links);
+
+    if (!mounted) return;
+
+    await _loadLinks();
+    _showSuccess('Link deleted successfully', isError: true);
+  }
+
+  Future<void> _copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      _showCopySuccess(text);
+    }
+  }
+
+  void _showCopySuccess(String copiedText) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Theme.of(context).colorScheme.onPrimary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Link Copied!',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  ),
+                  Text(
+                    copiedText,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.9),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      String finalUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        finalUrl = 'https://$url';
+      }
+
+      final uri = Uri.parse(finalUrl);
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        _showError('No app found to open this URL');
+      }
+    } catch (e) {
+      _showError('Failed to open: $url');
+    }
+  }
+
+  void _showSuccess(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onErrorContainer,
+          ),
+        ),
+        backgroundColor: isError
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.primary,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onError),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onError,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  // FUNGSI QR CODE YANG DIPERBAIKI
+  void _showQRCodeDialog(Link link) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.qr_code, color: link.color, size: 28),
+                        const SizedBox(width: 10),
+                        Text(
+                          'QR Code',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: link.color,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        size: 24,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // QR Code Container
+                Container(
+                  padding: const EdgeInsets.all(25),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: link.color.withOpacity(0.3), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: QrImageView(
+                    data: link.url,
+                    version: QrVersions.auto,
+                    size: 200.0,
+                    backgroundColor: Colors.white,
+                    eyeStyle: QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: link.color,
+                    ),
+                    dataModuleStyle: QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Link Info
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: link.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        link.title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: link.color,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      SelectableText(
+                        link.url,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _copyToClipboard(link.url);
+                        },
+                        icon: Icon(
+                          Icons.copy,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        label: Text(
+                          'Copy URL',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _launchUrl(link.url);
+                        },
+                        icon: const Icon(Icons.open_in_new, size: 18),
+                        label: const Text('Open Link'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: link.color,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Fitur akan segera hadir',
-            style: TextStyle(
-              color: Colors.grey,
+        );
+      },
+    );
+  }
+
+  void _showAddLinkDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(
+          'Add New Link',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                labelText: 'Title',
+                hintText: 'Enter link title',
+                border: const OutlineInputBorder(),
+                labelStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                ),
+              ),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              autofocus: true,
             ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _urlController,
+              decoration: InputDecoration(
+                labelText: 'URL',
+                hintText: 'example.com',
+                border: const OutlineInputBorder(),
+                prefixText: 'https://',
+                labelStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                ),
+              ),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              keyboardType: TextInputType.url,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _addLink();
+            },
+            child: const Text('Add Link'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      currentIndex: _currentIndex,
-      onTap: (index) => setState(() => _currentIndex = index),
-      type: BottomNavigationBarType.fixed,
-      selectedFontSize: 12,
-      unselectedFontSize: 12,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home),
-          label: 'Beranda',
+  void _showLinkOptions(Link link) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                height: 4,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: link.color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.qr_code, color: link.color),
+                ),
+                title: Text(
+                  'Generate QR Code',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: link.color,
+                  ),
+                ),
+                subtitle: Text(
+                  'Create QR code for this link',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showQRCodeDialog(link);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.open_in_new,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                title: Text(
+                  'Open Link',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _launchUrl(link.url);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.copy, color: Colors.green),
+                ),
+                title: Text(
+                  'Copy URL',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _copyToClipboard(link.url);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.edit, color: Colors.orange),
+                ),
+                title: Text(
+                  'Edit Link',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editLink(link);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete, color: Colors.red),
+                ),
+                title: Text(
+                  'Delete Link',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _deleteLink(link);
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _editLink(Link link) async {
+    _titleController.text = link.title;
+    _urlController.text = link.url.replaceFirst('https://', '').replaceFirst('http://', '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(
+          'Edit Link',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.video_library_outlined),
-          activeIcon: Icon(Icons.video_library),
-          label: 'Koleksi',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                labelText: 'Title',
+                border: const OutlineInputBorder(),
+                labelStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _urlController,
+              decoration: InputDecoration(
+                labelText: 'URL',
+                border: const OutlineInputBorder(),
+                prefixText: 'https://',
+                labelStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              keyboardType: TextInputType.url,
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              final links = await _linkService.getLinks();
+              final index = links.indexWhere((l) => l.id == link.id);
+
+              if (index != -1) {
+                final title = _titleController.text.trim();
+                final url = _urlController.text.trim();
+
+                if (title.isEmpty || url.isEmpty) {
+                  _showError('Please fill in both title and URL');
+                  return;
+                }
+
+                links[index] = Link(
+                  id: link.id,
+                  title: title,
+                  url: url.startsWith('http') ? url : 'https://$url',
+                  icon: link.icon,
+                  colorValue: link.colorValue,
+                );
+
+                await _linkService.saveLinks(links);
+                await _loadLinks();
+                _showSuccess('Link updated successfully!');
+              }
+
+              _titleController.clear();
+              _urlController.clear();
+            },
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinkCard(Link link, int index) {
+    return GestureDetector(
+      onLongPress: () => _showLinkOptions(link),
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200 + (index * 50)),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.only(bottom: 12),
+        transform: Matrix4.translationValues(0, _slideAnimation.value, 0),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Card(
+            elevation: 4,
+            color: Theme.of(context).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _launchUrl(link.url),
+                  splashColor: link.color.withOpacity(0.2),
+                  highlightColor: link.color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    leading: Container(
+                      width: 55,
+                      height: 55,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            link.color.withOpacity(0.3),
+                            link.color.withOpacity(0.1),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(
+                          color: link.color.withOpacity(0.2),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            link.icon,
+                            key: ValueKey(link.icon),
+                            style: const TextStyle(fontSize: 26),
+                          ),
+                        ),
+                      ),
+                    ),
+                    title: _buildHighlightedText(link.title, _currentSearchQuery, context),
+                    subtitle: Text(
+                      link.url,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: link.color.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.qr_code,
+                              size: 20,
+                              color: link.color,
+                            ),
+                          ),
+                          onPressed: () => _showQRCodeDialog(link),
+                          tooltip: 'Generate QR Code',
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.more_vert,
+                              size: 22,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                          ),
+                          onPressed: () => _showLinkOptions(link),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // PERBAIKAN: AppBar untuk mode search dengan tema konsisten
+  PreferredSizeWidget _buildSearchAppBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AppBar(
+      backgroundColor: isDark
+          ? Theme.of(context).colorScheme.surface
+          : Colors.white,
+      elevation: 2,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+      ),
+      leading: IconButton(
+        icon: Icon(
+          Icons.arrow_back,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        onPressed: _stopSearch,
+      ),
+      title: Container(
+        height: 45,
+        decoration: BoxDecoration(
+          color: isDark
+              ? Theme.of(context).colorScheme.surfaceVariant
+              : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark
+                ? Theme.of(context).colorScheme.outline.withOpacity(0.3)
+                : Colors.grey.shade300,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 12),
+            Icon(
+              Icons.search,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search links by title or URL...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                cursorColor: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            if (_searchController.text.isNotEmpty)
+              IconButton(
+                icon: Icon(
+                  Icons.clear,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                  size: 20,
+                ),
+                onPressed: () {
+                  _searchController.clear();
+                },
+                padding: const EdgeInsets.all(8),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        if (_currentSearchQuery.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  '${_filteredLinks.length} found',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 
   PreferredSizeWidget _buildNormalAppBar() {
     return AppBar(
-      title: Row(
-        children: [
-          Text(
-            'HaoTube',
-            style: GoogleFonts.poppins(
-              color: const Color(0xFF1a73e8),
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          const SizedBox(width: 4),
-          const Icon(
-            Icons.play_circle_fill,
-            color: Color(0xFFfbbc04),
-          ),
-        ],
+      title: const Text(
+        'Link4Fun',
+        style: TextStyle(fontWeight: FontWeight.bold),
       ),
+      centerTitle: false,
       actions: [
         IconButton(
-          icon: const Icon(Icons.search, color: Colors.black),
-          onPressed: () {
-            setState(() {
-              _isSearching = true;
-            });
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _searchFocusNode.requestFocus();
-            });
-          },
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.search,
+              size: 22,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          onPressed: _startSearch,
+          tooltip: 'Search',
         ),
         IconButton(
-          icon: const Icon(Icons.refresh, color: Colors.black),
-          onPressed: _refreshVideos,
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.add,
+              size: 22,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          onPressed: _showAddLinkDialog,
+          tooltip: 'Add New Link',
         ),
-        const SizedBox(width: 8),
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.refresh,
+              size: 22,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          onPressed: _refreshLinks,
+          tooltip: 'Refresh',
+        ),
       ],
     );
   }
 
-  PreferredSizeWidget _buildSearchAppBar() {
-    return AppBar(
-      backgroundColor: Colors.white,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black),
-        onPressed: () {
-          setState(() {
-            _isSearching = false;
-            _searchController.clear();
-          });
-        },
-      ),
-      title: Container(
-        height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFFf8f9fa),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: TextField(
-          controller: _searchController,
-          focusNode: _searchFocusNode,
-          decoration: InputDecoration(
-            hintText: 'Cari di HaoTube...',
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-              icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
-              onPressed: () {
-                _searchController.clear();
-              },
-            )
-                : null,
-          ),
-          onSubmitted: (value) {
-            if (value.isNotEmpty) {
-              _navigateToSearchScreen(value);
-            }
-          },
-          onChanged: (value) {
-            setState(() {});
-          },
-        ),
-      ),
-      actions: [
-        if (_searchController.text.isNotEmpty)
-          TextButton(
-            onPressed: () {
-              _navigateToSearchScreen(_searchController.text);
-            },
-            child: Text(
-              'CARI',
-              style: GoogleFonts.poppins(
-                color: const Color(0xFF1a73e8),
-                fontWeight: FontWeight.w600,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: _isSearching ? _buildSearchAppBar() : _buildNormalAppBar(),
+      body: FutureBuilder<List<Link>>(
+        future: _linksFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    width: 60,
+                    height: 60,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
+                      strokeWidth: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 500),
+                    opacity: 1.0,
+                    child: Text(
+                      'Loading your links...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
-      ],
-    );
-  }
+            );
+          }
 
-  void _navigateToSearchScreen(String query) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SearchScreen(searchQuery: query),
-      ),
-    ).then((_) {
-      if (mounted) {
-        setState(() {
-          _isSearching = false;
-          _searchController.clear();
-        });
-      }
-    });
-  }
+          if (snapshot.hasError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading links',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    snapshot.error.toString(),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _refreshLinks,
+                    child: const Text('Try Again'),
+                  ),
+                ],
+              ),
+            );
+          }
 
-  Widget _buildMiniPlayer() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VideoDetailScreen(
-              video: YouTubeVideo(
-                id: videoPlayerManager.currentVideoId!,
-                title: videoPlayerManager.currentVideoTitle ?? 'Video',
-                thumbnailUrl: '',
-                channelTitle: '',
-                viewCount: '',
-                publishedAt: '',
-                description: '',
-                duration: '',
-                likeCount: '',
-              ),
-            ),
-          ),
-        );
-      },
-      child: Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 140,
-          height: 90,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 15,
-                spreadRadius: 2,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Stack(
-              children: [
-                // Placeholder background
-                Container(
-                  color: Colors.grey[800],
-                  child: Center(
+          final linksToShow = _isSearching ? _filteredLinks : _allLinks;
+
+          if (linksToShow.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 500),
+                    width: 120,
+                    height: 120,
                     child: Icon(
-                      Icons.play_circle_fill,
-                      color: Colors.white.withOpacity(0.7),
-                      size: 40,
+                      Icons.add_link,
+                      size: 80,
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
                     ),
                   ),
-                ),
-
-                // PLAY/PAUSE BUTTON
-                Positioned.fill(
-                  child: Center(
-                    child: GestureDetector(
-                      onTap: () {
-                        videoPlayerManager.togglePlayPause();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          videoPlayerManager.isPlaying
-                              ? Icons.pause
-                              : Icons.play_arrow,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                  const SizedBox(height: 24),
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 500),
+                    opacity: 1.0,
+                    child: Text(
+                      _isSearching ? 'No search results' : 'Welcome to Link4Fun',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ),
-                ),
-
-                // VIDEO TITLE
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  right: 8,
-                  child: Text(
-                    videoPlayerManager.currentVideoTitle ?? 'Video',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: Text(
+                      _isSearching
+                          ? 'No links found for "$_currentSearchQuery"'
+                          : 'Add your favorite links and access them with one tap',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      ),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: _showAddLinkDialog,
+                    icon: Icon(
+                      Icons.add,
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    label: Text(
+                      _isSearching ? 'Add New Link' : 'Add Your First Link',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
 
-                // CLOSE BUTTON
-                Positioned(
-                  top: 4,
-                  right: 4,
-                  child: GestureDetector(
-                    onTap: () {
-                      videoPlayerManager.hideMiniPlayer();
-                      videoPlayerManager.disposeController();
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Column(
+              key: ValueKey(_isSearching),
+              children: [
+                if (!_isSearching)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Your Links (${linksToShow.length})',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    itemCount: linksToShow.length,
+                    itemBuilder: (context, index) {
+                      return _buildLinkCard(linksToShow[index], index);
                     },
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 12,
-                      ),
-                    ),
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// HOME SCREEN
-class HomeScreen extends StatelessWidget {
-  final Future<List<YouTubeVideo>> videosFuture;
-  final VoidCallback onRefresh;
-
-  const HomeScreen({
-    super.key,
-    required this.videosFuture,
-    required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        onRefresh();
-        await Future.delayed(const Duration(milliseconds: 500));
-      },
-      child: FutureBuilder<List<YouTubeVideo>>(
-        future: videosFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return _buildLoadingIndicator();
-          }
-
-          if (snapshot.hasError) {
-            return _buildErrorWidget(snapshot.error.toString());
-          }
-
-          final videos = snapshot.data ?? [];
-
-          if (videos.isEmpty) {
-            return _buildEmptyVideos();
-          }
-
-          return _buildVideoList(videos, context);
+          );
         },
-      ),
-    );
-  }
-
-  Widget _buildLoadingIndicator() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(
-            color: Color(0xFF1a73e8),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Memuat video trending dari YouTube...',
-            style: GoogleFonts.poppins(
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.error_outline,
-              color: Color(0xFF1a73e8),
-              size: 64,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Gagal memuat video trending',
-              style: GoogleFonts.poppins(
-                color: Colors.black,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error,
-              style: GoogleFonts.poppins(
-                color: Colors.grey,
-                fontSize: 12,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: onRefresh,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1a73e8),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Coba Lagi'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyVideos() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.video_library,
-            size: 64,
-            color: Colors.grey,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Tidak ada video trending',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 18,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Coba refresh atau periksa koneksi internet',
-            style: TextStyle(
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVideoList(List<YouTubeVideo> videos, BuildContext context) {
-    return ListView.builder(
-      itemCount: videos.length,
-      itemBuilder: (context, index) {
-        final video = videos[index];
-        return VideoCard(video: video);
-      },
-    );
-  }
-}
-
-// VIDEO CARD
-class VideoCard extends StatelessWidget {
-  final YouTubeVideo video;
-
-  const VideoCard({
-    super.key,
-    required this.video,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VideoDetailScreen(video: video),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            VideoThumbnail(
-              thumbnailUrl: video.thumbnailUrl,
-              duration: video.duration,
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFFfbbc04).withOpacity(0.2),
-                    child: Text(
-                      video.channelTitle.isNotEmpty
-                          ? video.channelTitle[0]
-                          : 'Y',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          video.title,
-                          style: GoogleFonts.poppins(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${video.channelTitle} • ${_formatViewCount(video.viewCount)} views • ${_formatTimeAgo(video.publishedAt)}',
-                          style: GoogleFonts.poppins(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatViewCount(String viewCount) {
-    final count = int.tryParse(viewCount) ?? 0;
-    if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(1)}M';
-    } else if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}K';
-    }
-    return count.toString();
-  }
-
-  String _formatTimeAgo(String publishedAt) {
-    try {
-      final date = DateTime.parse(publishedAt);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inDays > 365) {
-        return '${(difference.inDays / 365).floor()} tahun lalu';
-      } else if (difference.inDays > 30) {
-        return '${(difference.inDays / 30).floor()} bulan lalu';
-      } else if (difference.inDays > 0) {
-        return '${difference.inDays} hari lalu';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours} jam lalu';
-      } else {
-        return 'Baru saja';
-      }
-    } catch (e) {
-      return 'Beberapa waktu lalu';
-    }
-  }
-}
-
-// VIDEO DETAIL SCREEN
-class VideoDetailScreen extends StatefulWidget {
-  final YouTubeVideo video;
-
-  const VideoDetailScreen({
-    super.key,
-    required this.video,
-  });
-
-  @override
-  State<VideoDetailScreen> createState() => _VideoDetailScreenState();
-}
-
-class _VideoDetailScreenState extends State<VideoDetailScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Initialize video player
-    videoPlayerManager.initializeController(widget.video.id, widget.video.title);
-    videoPlayerManager.showMiniPlayer();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFf8f9fa),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
-        title: Text(
-          'HaoTube',
-          style: GoogleFonts.poppins(
-            color: const Color(0xFF1a73e8),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.black),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // YOUTUBE PLAYER
-            YouTubePlayerWidget(
-              videoId: widget.video.id,
-              videoTitle: widget.video.title,
-              autoPlay: true,
-            ),
-
-            // VIDEO INFO
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.video.title,
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        '${_formatViewCount(widget.video.viewCount)} views',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '•',
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatTimeAgo(widget.video.publishedAt),
-                        style: GoogleFonts.poppins(
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: const Color(0xFFfbbc04).withOpacity(0.2),
-                        radius: 20,
-                        child: Text(
-                          widget.video.channelTitle.isNotEmpty
-                              ? widget.video.channelTitle[0]
-                              : 'C',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.video.channelTitle,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Channel',
-                              style: GoogleFonts.poppins(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Subscribe'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // DESCRIPTION
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Description',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    widget.video.description.isNotEmpty
-                        ? widget.video.description
-                        : 'No description available',
-                    style: GoogleFonts.poppins(
-                      color: Colors.black,
-                      fontSize: 14,
-                    ),
-                    maxLines: 10,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatViewCount(String viewCount) {
-    final count = int.tryParse(viewCount) ?? 0;
-    if (count >= 1000000) {
-      return '${(count / 1000000).toStringAsFixed(1)}M';
-    } else if (count >= 1000) {
-      return '${(count / 1000).toStringAsFixed(1)}K';
-    }
-    return count.toString();
-  }
-
-  String _formatTimeAgo(String publishedAt) {
-    try {
-      final date = DateTime.parse(publishedAt);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inDays > 365) {
-        return '${(difference.inDays / 365).floor()} years ago';
-      } else if (difference.inDays > 30) {
-        return '${(difference.inDays / 30).floor()} months ago';
-      } else if (difference.inDays > 0) {
-        return '${difference.inDays} days ago';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours} hours ago';
-      } else {
-        return 'Just now';
-      }
-    } catch (e) {
-      return 'Some time ago';
-    }
-  }
-}
-
-// SEARCH SCREEN
-class SearchScreen extends StatefulWidget {
-  final String searchQuery;
-
-  const SearchScreen({super.key, required this.searchQuery});
-
-  @override
-  State<SearchScreen> createState() => _SearchScreenState();
-}
-
-class _SearchScreenState extends State<SearchScreen> {
-  late Future<List<YouTubeVideo>> _searchFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchFuture = YouTubeService.searchVideos(widget.searchQuery);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Hasil Pencarian: "${widget.searchQuery}"'),
-      ),
-      body: Stack(
-        children: [
-          FutureBuilder<List<YouTubeVideo>>(
-            future: _searchFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return _buildLoadingIndicator();
-              }
-
-              if (snapshot.hasError) {
-                return _buildErrorWidget(snapshot.error.toString());
-              }
-
-              final videos = snapshot.data ?? [];
-
-              if (videos.isEmpty) {
-                return _buildEmptyResult();
-              }
-
-              return ListView.builder(
-                itemCount: videos.length,
-                itemBuilder: (context, index) {
-                  final video = videos[index];
-                  return VideoCard(video: video);
-                },
-              );
-            },
-          ),
-
-          // MINI PLAYER
-          if (videoPlayerManager.isMiniPlayerVisible &&
-              videoPlayerManager.controller != null &&
-              !videoPlayerManager.isFullscreen)
-            Positioned(
-              bottom: 80,
-              right: 16,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: Container(
-                  width: 120,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Stack(
-                      children: [
-                        Container(
-                          color: Colors.grey[800],
-                          child: Center(
-                            child: Icon(
-                              Icons.play_circle_fill,
-                              color: Colors.white.withOpacity(0.7),
-                              size: 30,
-                            ),
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.black.withOpacity(0.3),
-                            child: Center(
-                              child: GestureDetector(
-                                onTap: () {
-                                  videoPlayerManager.togglePlayPause();
-                                },
-                                child: Icon(
-                                  videoPlayerManager.isPlaying
-                                      ? Icons.pause
-                                      : Icons.play_arrow,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () {
-                              videoPlayerManager.hideMiniPlayer();
-                              videoPlayerManager.disposeController();
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingIndicator() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(
-            color: Color(0xFF1a73e8),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Mencari "${widget.searchQuery}"...',
-            style: GoogleFonts.poppins(
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.search_off,
-            size: 64,
-            color: Colors.grey,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Pencarian gagal',
-            style: GoogleFonts.poppins(
-              color: Colors.black,
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            error,
-            style: GoogleFonts.poppins(
-              color: Colors.grey,
-              fontSize: 12,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyResult() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: Colors.grey,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Tidak ada hasil ditemukan',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 16,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Coba dengan kata kunci yang berbeda',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-            ),
-          ),
-        ],
       ),
     );
   }
