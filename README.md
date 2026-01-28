@@ -1,16 +1,16 @@
-# 🎥 HaoTube - Video Streaming Application
+#  HaoTube - Video Streaming Application
 
 A video streaming application built with Flutter to deliver a smooth and intuitive video watching experience.
 
-## ✨ Main Features
+##  Main Features
 
-- 🎬 **Video Streaming** - Play videos from YouTube with the best quality
-- 🔍 **Video Search** - Easily search for favorite videos
-- 📱 **Responsive Design** - Responsive display across various screen sizes
-- 🎨 **Modern UI** - Clean and user-friendly interface with Material Design 3
-- 📺 **Fullscreen Mode** - Immersive fullscreen viewing experience
+-  **Video Streaming** - Play videos from YouTube with the best quality
+-  **Video Search** - Easily search for favorite videos
+-  **Responsive Design** - Responsive display across various screen sizes
+-  **Modern UI** - Clean and user-friendly interface with Material Design 3
+-  **Fullscreen Mode** - Immersive fullscreen viewing experience
 
-## 🛠️ Technologies Used
+##  Technologies Used
 
 - **Framework**: Flutter 3.0+
 - **Language**: Dart 3.0+
@@ -18,7 +18,7 @@ A video streaming application built with Flutter to deliver a smooth and intuiti
 - **Font**: Google Fonts (Poppins)
 - **Video Player**: youtube_player_flutter
 
-## 📦 Main Dependencies
+##  Main Dependencies
 
 ```yaml
 - flutter: Main SDK
@@ -28,7 +28,7 @@ A video streaming application built with Flutter to deliver a smooth and intuiti
 - url_launcher: ^6.3.2 - Open external URLs
 ```
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 - Flutter SDK 3.0.0+
@@ -64,7 +64,7 @@ flutter build apk
 flutter build ios
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 lib/
@@ -76,12 +76,12 @@ lib/
     └── colors.dart           # Color constants
 ```
 
-## 🐛 Known Issues
+##  Known Issues
 
 ### Video Pause/Repeat in Fullscreen Mode
 There is a bug where video will **pause or repeat** when:
-- ✋ **Entering fullscreen mode**
-- ✋ **Exiting fullscreen mode**
+-  **Entering fullscreen mode**
+-  **Exiting fullscreen mode**
 
 **Status**: Currently being fixed  
 **Affected**: youtube_player_flutter dependency  
@@ -89,7 +89,7 @@ There is a bug where video will **pause or repeat** when:
 
 If you find a solution or have suggestions, please create an **Issue** or **Pull Request**.
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are highly welcome! Here's how:
 
@@ -99,11 +99,11 @@ Contributions are highly welcome! Here's how:
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Create a Pull Request
 
-## 📝 License
+##  License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 📧 Contact
+##  Contact
 
 If you have any questions or suggestions, please create an issue in this repository.
 
